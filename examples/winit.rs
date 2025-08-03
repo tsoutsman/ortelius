@@ -3,8 +3,8 @@ use rand_distr::{Distribution, StandardNormal};
 use vello::{Scene, peniko::color::AlphaColor};
 
 fn main() {
-    const NUM_STEPS: usize = 50_000;
-    const INITIAL_VALUE: f64 = 0.0;
+    const NUM_STEPS: usize = 550;
+    const INITIAL_VALUE: f32 = 0.0;
 
     // 2. Set up the random number generator and the distribution.
     // `thread_rng` is a fast, cryptographically secure RNG provided by the OS.
@@ -20,55 +20,30 @@ fn main() {
     let mut current_value2 = INITIAL_VALUE;
 
     for i in 0..NUM_STEPS {
-        xs.push(i as f64);
-
+        xs.push(i as f32 / 200. - 1.1);
         ys.push(current_value);
-        let random_step: f64 = dist.sample(&mut rng);
-        current_value += random_step;
+
+        let random_step: f32 = dist.sample(&mut rng);
+        current_value += random_step * 0.02;
 
         ys2.push(current_value2);
-        let random_step: f64 = dist.sample(&mut rng);
-        current_value2 += random_step;
+        let random_step: f32 = dist.sample(&mut rng);
+        current_value2 += random_step * 0.02;
     }
 
     println!("done");
 
-    let plot = ortelius::Plot {
-        bounds: ortelius::Bounds {
-            //x: (-1./50. * NUM_STEPS as f64, NUM_STEPS as f64 + 1./50. * NUM_STEPS as f64),
-            x: (0., 400.),
-            y: (-100., 100.),
-            // x: (0., 1.),
-            // y: (0., 1.)
-        },
-        padding_layers: vec![
-            ortelius::PaddingLayer::XAxis {},
-            ortelius::PaddingLayer::YAxis {},
-        ],
-        data_layers: vec![
-            ortelius::DataLayer::Line {
-                xs: xs.clone(),
-                ys,
-                color: AlphaColor::new([0.0, 0.0, 1.0, 1.0]),
-                width: 3.0,
-            },
-            ortelius::DataLayer::Line {
-                xs,
-                ys: ys2,
-                color: AlphaColor::new([1.0, 0.0, 1.0, 1.0]),
-                width: 3.0,
-            },
-        ],
-        width: 700,
-        height: 400,
-        scene: Scene::new(),
-        padding: ortelius::Padding {
-            left: 48,
-            right: 0,
-            top: 0,
-            bottom: 48,
-        },
-    };
-
-    ortelius::launch(plot);
+    ortelius::plot(
+        ortelius::PlotLayout::new()
+            .with_width(800.0)
+            .with_height(600.0)
+            .with_padding(ortelius::Padding {
+                top: 20.0,
+                bottom: 20.0,
+                left: 50.0,
+                right: 20.0,
+            }),
+        xs,
+        ys,
+    );
 }
