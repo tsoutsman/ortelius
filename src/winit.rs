@@ -34,7 +34,7 @@ pub(crate) enum App<'s> {
         layout: PlotInstanceLayout,
         line: Line,
 
-        line_renderer: crate::layer::LineRenderer,
+        renderer: crate::render::Renderer,
         msaa_view: wgpu::TextureView,
     },
 }

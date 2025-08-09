@@ -1,6 +1,7 @@
 mod buffer;
 mod layer;
 mod layout;
+mod render;
 mod winit;
 
 pub use crate::{

@@ -2,6 +2,8 @@ use std::ops::{Add, AddAssign};
 
 use winit::window::Window;
 
+use crate::render::SceneParams;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlotLayout {
     pub width: f64,
@@ -39,6 +41,10 @@ impl PlotLayout {
     pub fn with_interaction_bounds(mut self, bounds: Bounds) -> Self {
         self.interaction_bounds = bounds;
         self
+    }
+
+    pub fn scene_params(self) -> SceneParams {
+        todo!();
     }
 
     pub(crate) fn instantiate(

@@ -1,6 +1,5 @@
 use rand::thread_rng;
 use rand_distr::{Distribution, StandardNormal};
-use vello::{Scene, peniko::color::AlphaColor};
 
 fn main() {
     const NUM_STEPS: usize = 550;
