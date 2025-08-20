@@ -76,6 +76,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     fn grow(&mut self, device: &wgpu::Device, required_size: u64) -> CommandEncoder {
         let new_capacity = pad_size((self.growth)(self.capacity, required_size, false));
         assert!(
@@ -107,6 +108,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn extend<F>(&mut self, device: &wgpu::Device, length: usize, fill: F) -> CommandBuffer
     where
         F: FnOnce(&mut [T]),
@@ -140,6 +142,7 @@ where
     }
 
     #[inline]
+    #[must_use]
     pub fn as_entire_binding(&self) -> BindingResource<'_> {
         self.inner.as_entire_binding()
     }

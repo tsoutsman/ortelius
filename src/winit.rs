@@ -1,63 +1,47 @@
-use std::sync::Arc;
+use std::{mem, sync::Arc};
 
-use vello::{
-    kurbo::Point,
-    util::{RenderContext, RenderSurface},
-    wgpu,
-};
+use vello::{kurbo::Point, util::RenderContext, wgpu};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::{ElementState, MouseButton, WindowEvent},
-    event_loop::EventLoop,
+    event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{Key, ModifiersState, NamedKey},
     window::Window,
 };
 
 use crate::{
-    layer::Line,
+    layer::{Layer, LayerSpecification},
     layout::{PlotInstanceLayout, PlotLayout},
+    render::Renderer,
 };
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum App<'s> {
     Uninitialized {
-        xs: Vec<f32>,
-        ys: Vec<f32>,
         layout: PlotLayout,
+        layers: Vec<LayerSpecification>,
     },
     Initialized {
-        surface: RenderSurface<'s>,
+        layout: PlotInstanceLayout,
+        layers: Vec<Layer>,
+
         window: Arc<Window>,
         input: Input,
-        context: RenderContext,
-        layout: PlotInstanceLayout,
-        line: Line,
-
-        renderer: crate::render::Renderer,
-        msaa_view: wgpu::TextureView,
+        renderer: Renderer<'s>,
     },
 }
 
-fn create_multisampled_framebuffer(
-    device: &wgpu::Device,
-    config: &wgpu::SurfaceConfiguration,
-) -> wgpu::TextureView {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Multisample Framebuffer"),
-        size: wgpu::Extent3d {
-            width: config.width,
-            height: config.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 4,
-        dimension: wgpu::TextureDimension::D2,
-        format: config.format,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        view_formats: &[],
-    });
-    texture.create_view(&wgpu::TextureViewDescriptor::default())
+pub struct Update {
+    layer: usize,
+    line: Option<usize>,
+    kind: UpdateKind,
+}
+
+pub enum UpdateKind {
+    Append { x: f32, y: f32 },
+    Extend { xs: Vec<f32>, ys: Vec<f32> },
+    Set { xs: Vec<f32>, ys: Vec<f32> },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -68,19 +52,61 @@ pub(crate) struct Input {
 }
 
 impl<'s> App<'s> {
-    pub(crate) fn new(layout: PlotLayout, xs: Vec<f32>, ys: Vec<f32>) -> Self {
-        Self::Uninitialized { layout, xs, ys }
+    pub(crate) fn new(layout: PlotLayout, layers: Vec<LayerSpecification>) -> Self {
+        Self::Uninitialized { layout, layers }
     }
 
-    pub(crate) fn display(&mut self) {
-        EventLoop::new().unwrap().run_app(self).unwrap();
+    pub(crate) fn display<F>(&mut self, f: F)
+    where
+        F: FnOnce(crate::Channel),
+    {
+        let event_loop = EventLoop::with_user_event().build().unwrap();
+        f(event_loop.create_proxy());
+        event_loop.run_app(self).unwrap();
     }
 }
 
-impl ApplicationHandler for App<'_> {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+impl ApplicationHandler<Update> for App<'_> {
+    fn user_event(&mut self, _: &ActiveEventLoop, update: Update) {
         match self {
-            App::Uninitialized { xs, ys, layout } => {
+            App::Uninitialized { .. } => todo!(),
+            App::Initialized {
+                layers,
+                window,
+                renderer,
+                ..
+            } => {
+                let layer = layers.get_mut(update.layer).unwrap();
+                if let Some(line) = update.line {
+                    if let Layer::Lines(lines) = layer {
+                        let line = lines.get_mut(line).unwrap();
+                        let device = renderer.device();
+
+                        let command_buffer = match update.kind {
+                            UpdateKind::Append { x, y } => line.append(device, x, y),
+                            UpdateKind::Extend { xs, ys } => line.extend(device, &xs, &ys),
+                            UpdateKind::Set { .. } => todo!(),
+                        };
+
+                        renderer.queue().submit([command_buffer]);
+                        // TODO: do we have to do this?
+                        device.poll(wgpu::PollType::Poll).unwrap();
+                    } else {
+                        panic!("specified line index for non-line layer");
+                    }
+                } else {
+                    todo!();
+                }
+
+                // TODO: only redraw if new data in viewport.
+                window.request_redraw();
+            }
+        }
+    }
+
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        match self {
+            App::Uninitialized { layout, layers } => {
                 let window = Arc::new(
                     event_loop
                         .create_window(
@@ -110,21 +136,21 @@ impl ApplicationHandler for App<'_> {
 
                 window.request_redraw();
 
-                let line = Line::new(&context.devices[surface.dev_id].device, xs, ys);
+                let mut layers_data = Vec::new();
+                mem::swap(&mut layers_data, layers);
+
+                let device = &context.devices[surface.dev_id].device;
+                let queue = &context.devices[surface.dev_id].queue;
                 *self = App::Initialized {
                     window,
-                    msaa_view: create_multisampled_framebuffer(
-                        &context.devices[surface.dev_id].device,
-                        &surface.config,
-                    ),
-                    line_renderer: crate::layer::LineRenderer::create(
-                        &context.devices[surface.dev_id].device,
-                    ),
-                    surface,
                     input: Input::default(),
-                    context,
                     layout,
-                    line,
+                    // TODO: don't clone
+                    renderer: Renderer::new(device.clone(), queue.clone(), surface.surface),
+                    layers: layers_data
+                        .into_iter()
+                        .map(|spec| spec.init(device))
+                        .collect(),
                 };
             }
             App::Initialized { .. } => {}
@@ -140,14 +166,11 @@ impl ApplicationHandler for App<'_> {
         match self {
             App::Uninitialized { .. } => {}
             App::Initialized {
-                surface,
                 window,
                 input,
-                context,
                 layout,
-                msaa_view,
-                line,
-                line_renderer,
+                renderer,
+                layers,
             } => {
                 if window.id() != window_id {
                     return;
@@ -166,7 +189,7 @@ impl ApplicationHandler for App<'_> {
                         }
                     }
                     WindowEvent::Resized(size) => {
-                        context.resize_surface(surface, size.width, size.height);
+                        renderer.resize(size.width, size.height);
                         layout.resize(size.width, size.height);
                         window.request_redraw();
                     }
@@ -217,32 +240,7 @@ impl ApplicationHandler for App<'_> {
                         input.prior_position = Some(position);
                     }
                     WindowEvent::RedrawRequested => {
-                        let handle = &context.devices[surface.dev_id];
-
-                        let mut encoder =
-                            handle
-                                .device
-                                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                                    label: Some("Line Render Encoder"),
-                                });
-
-                        let output = surface.surface.get_current_texture().unwrap();
-                        let view = output
-                            .texture
-                            .create_view(&wgpu::TextureViewDescriptor::default());
-
-                        line_renderer.render(
-                            &handle.device,
-                            &mut encoder,
-                            &view,
-                            &msaa_view,
-                            [&*line].into_iter(),
-                        );
-
-                        handle.queue.submit([encoder.finish()]);
-                        output.present();
-
-                        handle.device.poll(wgpu::PollType::Poll).unwrap();
+                        renderer.render(layers.iter(), layout);
                     }
                     _ => {}
                 }

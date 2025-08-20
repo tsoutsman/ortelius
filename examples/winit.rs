@@ -1,3 +1,4 @@
+use ortelius::{LayerSpecification, LineSpecification};
 use rand::thread_rng;
 use rand_distr::{Distribution, StandardNormal};
 
@@ -5,9 +6,6 @@ fn main() {
     const NUM_STEPS: usize = 550;
     const INITIAL_VALUE: f32 = 0.0;
 
-    // 2. Set up the random number generator and the distribution.
-    // `thread_rng` is a fast, cryptographically secure RNG provided by the OS.
-    // `StandardNormal` is the standard normal distribution (mean=0, stddev=1).
     let mut rng = thread_rng();
     let dist = StandardNormal;
 
@@ -30,6 +28,11 @@ fn main() {
         current_value2 += random_step * 0.02;
     }
 
+    let layers = vec![LayerSpecification::Lines(vec![LineSpecification {
+        xs,
+        ys,
+    }])];
+
     println!("done");
 
     ortelius::plot(
@@ -42,7 +45,7 @@ fn main() {
                 left: 50.0,
                 right: 20.0,
             }),
-        xs,
-        ys,
+        layers,
+        |_| {},
     );
 }

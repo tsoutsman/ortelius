@@ -43,10 +43,6 @@ impl PlotLayout {
         self
     }
 
-    pub fn scene_params(self) -> SceneParams {
-        todo!();
-    }
-
     pub(crate) fn instantiate(
         self,
         window: &Window,
@@ -99,6 +95,29 @@ pub(crate) struct PlotInstanceLayout {
 }
 
 impl PlotInstanceLayout {
+    pub fn scene_params(&self) -> SceneParams {
+        let x = self.data_bounds.x;
+        let y = self.data_bounds.y;
+
+        let width = x.size() as f32;
+        let height = y.size() as f32;
+
+        SceneParams {
+            projection_matrix: [
+                [2. / width, 0., 0., -(x.min + x.max) as f32 / width],
+                [0., 2. / height, 0., -(y.min + y.max) as f32 / height],
+                [0., 0., 0., 0.],
+                [0., 0., 0., 1.],
+            ],
+            // TODO
+            xclip_bounds: [0., 100.],
+            // TODO
+            yclip_bounds: [0., 100.],
+            viewport_size: [self.logical_width as f32, self.logical_height as f32],
+            _padding: [0., 0.],
+        }
+    }
+
     fn is_on_inner(&self, mouse_position: (f64, f64)) -> bool {
         let (mut x, mut y) = mouse_position;
         x /= self.scale_factor;
@@ -171,7 +190,7 @@ impl PlotInstanceLayout {
         );
 
         let data_x =
-            change.0 * self.data_bounds.x.size() / (self.scale_factor * self.inner_width());
+            -change.0 * self.data_bounds.x.size() / (self.scale_factor * self.inner_width());
         let data_y =
             change.1 * self.data_bounds.y.size() / (self.scale_factor * self.inner_height());
 
@@ -179,6 +198,8 @@ impl PlotInstanceLayout {
         self.data_bounds.y += data_y;
 
         self.data_bounds = self.interaction_bounds.clamp(self.data_bounds);
+        println!("{:?}", self.data_bounds.x);
+        //println!("{:?} {:?}", start_drag_mouse_position, current_position);
     }
 
     pub(crate) fn zoom(&mut self, mouse_position: (f64, f64), factor: f64) {

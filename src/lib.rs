@@ -4,17 +4,26 @@ mod layout;
 mod render;
 mod winit;
 
+use crate::buffer::GpuBuffer;
 pub use crate::{
-    buffer::GpuBuffer,
-    layer::Layer,
+    layer::{Layer, LayerSpecification, LineSpecification},
     layout::{Bounds, Padding, PlotLayout},
+    winit::{Update, UpdateKind},
 };
 
-pub enum NewData {
-    Point { x: f32, y: f32 },
-    Points { xs: Vec<f32>, ys: Vec<f32> },
+type Channel = ::winit::event_loop::EventLoopProxy<Update>;
+
+trait State {
+    type Event;
+
+    fn update(&mut self, event: Self::Event);
+
+    fn plot(&self) -> PlotLayout;
 }
 
-pub fn plot(layout: PlotLayout, xs: Vec<f32>, ys: Vec<f32>) {
-    winit::App::new(layout, xs, ys).display();
+pub fn plot<F>(layout: PlotLayout, layers: Vec<LayerSpecification>, f: F)
+where
+    F: FnOnce(Channel),
+{
+    winit::App::new(layout, layers).display(f);
 }

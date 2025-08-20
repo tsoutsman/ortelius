@@ -72,6 +72,7 @@ impl LineRenderer {
         encoder: &mut wgpu::CommandEncoder,
         view: &wgpu::TextureView,
         msaa_view: &wgpu::TextureView,
+        scene_params: SceneParams,
         lines: I,
     ) where
         I: Iterator<Item = &'a Line>,
@@ -98,11 +99,6 @@ impl LineRenderer {
 
         render_pass.set_pipeline(&self.render_pipeline);
 
-        let scene_params = SceneParams {
-            scale: [1.0, 1.0],
-            offset: [0., 0.0],
-            padding: [0.; 4],
-        };
         let bind_group0 = self.create_group0(device, scene_params);
         render_pass.set_bind_group(0, &bind_group0, &[]);
 

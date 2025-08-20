@@ -1,18 +1,18 @@
 mod line;
 
-use vello::wgpu::{self, BufferUsages, CommandBuffer};
+use vello::wgpu::{self, BufferUsages, CommandBuffer, Device};
 
 use crate::GpuBuffer;
 
 pub enum Layer<'a> {
-    XAxis,
-    YAxis,
-    Lines(&'a [Line]),
+    Title(&'a str),
+    XAxis { label: Option<&'a str> },
+    YAxis { label: Option<&'a str> },
+    Lines(Vec<Line>),
     Scatter,
 }
 
 pub struct Line {
-    pub(crate) buffer: GpuBuffer<f32>,
     pub(crate) thickness: f32,
     pub(crate) colour: f32,
 }
@@ -34,6 +34,7 @@ impl Line {
         }
     }
 
+    #[must_use]
     pub fn append(&mut self, device: &wgpu::Device, x: f32, y: f32) -> CommandBuffer {
         self.buffer.extend(device, 2, |buffer| {
             buffer[0] = x;
@@ -41,6 +42,7 @@ impl Line {
         })
     }
 
+    #[must_use]
     pub fn extend(&mut self, device: &wgpu::Device, xs: &[f32], ys: &[f32]) -> CommandBuffer {
         assert_eq!(xs.len(), ys.len(), "xs and ys must have the same length");
 

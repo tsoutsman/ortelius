@@ -1,6 +1,9 @@
 struct SceneParams {
-    scale: vec2<f32>,
-    offset: vec2<f32>,
+    projection_matrix: mat4x4<f32>,
+    xclip_bounds: vec2<f32>,
+    yclip_bounds: vec2<f32>,
+    viewport_size: vec2<f32>,
+    _padding: vec2<f32>,
 };
 
 // Data passed from the vertex to the fragment shader
@@ -17,50 +20,107 @@ struct Varyings {
 @group(1) @binding(1) var<uniform> thickness: f32;
 
 
+// @vertex
+// fn vs_main(
+//     @builtin(vertex_index) vertex_index: u32
+// ) -> Varyings {
+//     // Each segment needs 4 vertices to make a quad (2 triangles)
+//     let segment_index = vertex_index / 4u;
+//     let corner_index = vertex_index % 4u;
+// 
+//     // Get the two points for this segment
+//     let p1_raw = scene.projection_matrix * vec4<f32>(points[segment_index], 0.0, 1.0);
+//     let p2_raw = scene.projection_matrix * vec4<f32>(points[segment_index + 1u], 0.0, 1.0);
+// 
+//     // Determine the normal and extrusion direction
+//     let dir = normalize(p2_raw - p1_raw);
+//     var normal = vec2<f32>(-dir.y, dir.x);
+//     // Correct the normal for non-uniform scaling
+//     normal = normal / length(normal);
+// 
+//     // s is -1 if corner_index is 0 or 2, 1 otherwise
+//     // let s = (corner_index % 2u) * 2. - 1.;
+// 
+//     let half = thickness / 2.0;
+// 
+//     // Determine the vertex position for the quad
+//     var point_pos: vec2<f32>;
+//     if (corner_index == 0u) { // Top-left
+//         point_pos = p1_raw - normal * half;
+//     } else if (corner_index == 1u) { // Bottom-left
+//         point_pos = p1_raw + normal * half;
+//     } else if (corner_index == 2u) { // Top-right
+//         point_pos = p2_raw - normal * half;
+//     } else { // Bottom-right
+//         point_pos = p2_raw + normal * half;
+//     }
+//     
+//     // Create the final clip-space position
+//     let final_pos = point_pos;// * scene.scale + scene.offset;
+// 
+//     var out: Varyings;
+//     out.position = scene.projection_matrix * vec4<f32>(final_pos, 0.0, 1.0);
+//     // Pass the UN-SCALED segment points to the fragment shader
+//     out.p1 = p1_raw;// * scene.scale + scene.offset;
+//     out.p2 = p2_raw;// * scene.scale + scene.offset;
+//     out.clip_pos = final_pos;
+//     return out;
+// }
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32
 ) -> Varyings {
-    // Each segment needs 4 vertices to make a quad (2 triangles)
     let segment_index = vertex_index / 4u;
     let corner_index = vertex_index % 4u;
 
-    // Get the two points for this segment
+    // Get the two points for this segment in data space
     let p1_raw = points[segment_index];
     let p2_raw = points[segment_index + 1u];
 
-    // Determine the normal and extrusion direction
-    let dir = normalize(p2_raw - p1_raw);
-    var normal = vec2<f32>(-dir.y, dir.x);
-    // Correct the normal for non-uniform scaling
-    normal = normal / length(normal * scene.scale);
+    // --- MODIFICATION START ---
 
-    // s is -1 if corner_index is 0 or 2, 1 otherwise
-    // let s = (corner_index % 2u) * 2. - 1.;
+    // 1. Transform endpoints into 4D clip space
+    let p1_clip = scene.projection_matrix * vec4<f32>(p1_raw, 0.0, 1.0);
+    let p2_clip = scene.projection_matrix * vec4<f32>(p2_raw, 0.0, 1.0);
 
-    let half = thickness / 2.0;
+    // 2. Convert to 2D Normalized Device Coordinates (NDC) by perspective divide
+    // This gives us a uniform coordinate system from -1.0 to 1.0.
+    let p1_ndc = p1_clip.xy / p1_clip.w;
+    let p2_ndc = p2_clip.xy / p2_clip.w;
 
-    // Determine the vertex position for the quad
-    var point_pos: vec2<f32>;
-    if (corner_index == 0u) { // Top-left
-        point_pos = p1_raw - normal * half;
-    } else if (corner_index == 1u) { // Bottom-left
-        point_pos = p1_raw + normal * half;
-    } else if (corner_index == 2u) { // Top-right
-        point_pos = p2_raw - normal * half;
-    } else { // Bottom-right
-        point_pos = p2_raw + normal * half;
-    }
+    // 3. Calculate direction and normal IN SCREEN-RELATIVE SPACE
+    // We multiply by viewport_size to correct for aspect ratio before normalizing.
+    let dir_screen = normalize((p2_ndc - p1_ndc) * scene.viewport_size);
+    let normal_screen = vec2<f32>(-dir_screen.y, dir_screen.x);
+
+    // 4. Calculate the thickness offset in NDC units
+    let thickness_pixels = 5.;
+    let half_thickness_ndc = (normal_screen * thickness_pixels) / scene.viewport_size;
+
+    // 5. Determine which point to extrude and in which direction
+    let base_ndc = select(p2_ndc, p1_ndc, corner_index < 2u); // p1 for corners 0,1; p2 for 2,3
+    let extrusion_sign = select(1.0, -1.0, (corner_index & 1u) == 0u); // -1 for top, 1 for bottom
+
+    let final_ndc = base_ndc + extrusion_sign * half_thickness_ndc;
+
+    // 6. Reconstruct the final 4D clip space position
+    // Use the z and w from the original transformed point to maintain depth.
+    let base_clip = select(p2_clip, p1_clip, corner_index < 2u);
+    let final_clip_pos = vec4<f32>(final_ndc * base_clip.w, base_clip.z, base_clip.w);
     
-    // Create the final clip-space position
-    let final_pos = point_pos;// * scene.scale + scene.offset;
+    // --- MODIFICATION END ---
 
     var out: Varyings;
-    out.position = vec4<f32>(final_pos, 0.0, 1.0);
-    // Pass the UN-SCALED segment points to the fragment shader
-    out.p1 = p1_raw;// * scene.scale + scene.offset;
-    out.p2 = p2_raw;// * scene.scale + scene.offset;
-    out.clip_pos = final_pos;
+    out.position = final_clip_pos;
+    
+    // Pass original data-space points to fragment shader as before
+    out.p1 = p1_raw;
+    out.p2 = p2_raw;
+    // Pass the final data_pos for this vertex (calculated via inverse projection if needed,
+    // or just leave it as is if the fragment shader doesn't need it transformed)
+    out.clip_pos = vec2(0.0); // Or calculate appropriately if needed
+    
     return out;
 }
 
