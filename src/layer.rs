@@ -10,22 +10,28 @@ pub enum Layer<'a> {
     XAxis { label: Option<&'a str> },
     YAxis { label: Option<&'a str> },
     Lines(Vec<Line<'a>>),
-    Scatter,
+    Scatter(Scatter<'a>),
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Line<'a> {
-    pub data: &'a LineBuffer,
+    pub data: &'a PointBuffer,
     pub thickness: f32,
     pub colour: [f32; 4],
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Scatter<'a> {
+    pub data: &'a PointBuffer,
+    pub radius: f32,
+}
+
 #[derive(Debug)]
-pub struct LineBuffer {
+pub struct PointBuffer {
     inner: GpuBuffer<f32>,
 }
 
-impl LineBuffer {
+impl PointBuffer {
     pub fn new(device: &wgpu::Device) -> Self {
         Self {
             inner: GpuBuffer::new(

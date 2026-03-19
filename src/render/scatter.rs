@@ -3,27 +3,27 @@ mod layout;
 use bytemuck::{Pod, Zeroable};
 use vello::wgpu::{self, util::DeviceExt};
 
-use crate::{layer::Line, render::SceneParams};
+use crate::{layer::Scatter, render::SceneParams};
 
-pub(crate) struct LineRenderer {
+pub(crate) struct ScatterRenderer {
     // _cull_pipeline: wgpu::ComputePipeline,
     render_pipeline: wgpu::RenderPipeline,
     group0_layout: wgpu::BindGroupLayout,
     group1_layout: wgpu::BindGroupLayout,
 }
 
-impl LineRenderer {
+impl ScatterRenderer {
     pub(crate) fn new(device: &wgpu::Device) -> Self {
         let group0_layout = layout::group0_layout(device);
         let group1_layout = layout::group1_layout(device);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Line Pipeline Layout"),
+            label: Some("Render Scatter Pipeline Layout"),
             bind_group_layouts: &[&group0_layout, &group1_layout],
             push_constant_ranges: &[],
         });
 
-        LineRenderer {
+        ScatterRenderer {
             // _cull_pipeline: Line::cull_pipeline(device, &pipeline_layout),
             render_pipeline: layout::render_pipeline(device, &pipeline_layout, false),
             group0_layout,
@@ -34,7 +34,7 @@ impl LineRenderer {
     fn create_group0(&self, device: &wgpu::Device, scene_params: SceneParams) -> wgpu::BindGroup {
         let scene_buffer = to_buffer(device, &scene_params);
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Line Bind Group 0"),
+            label: Some("Scatter Bind Group 0"),
             layout: &self.group0_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -43,21 +43,21 @@ impl LineRenderer {
         })
     }
 
-    fn create_group1(&self, device: &wgpu::Device, line: Line<'_>) -> wgpu::BindGroup {
-        let thickness_buffer = to_buffer(device, &[line.thickness, 0., 0., 0.]);
-        let colour_buffer = to_buffer(device, &line.colour);
+    fn create_group1(&self, device: &wgpu::Device, scatter: Scatter<'_>) -> wgpu::BindGroup {
+        let radius_buffer = to_buffer(device, &[scatter.radius, 0., 0., 0.]);
+        let colour_buffer = to_buffer(device, &[0., 0., 0., 1.]);
 
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Line Bind Group 1"),
+            label: Some("Scatter Bind Group 1"),
             layout: &self.group1_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: line.data.as_entire_binding(),
+                    resource: scatter.data.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: thickness_buffer.as_entire_binding(),
+                    resource: radius_buffer.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -76,20 +76,16 @@ impl LineRenderer {
         scene_params: SceneParams,
         lines: I,
     ) where
-        I: Iterator<Item = Line<'a>>,
+        I: Iterator<Item = Scatter<'a>>,
     {
+        println!("rendering");
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Line Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: msaa_view,
                 resolve_target: Some(view),
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 1.0,
-                        g: 1.0,
-                        b: 1.0,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Load,
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -107,7 +103,7 @@ impl LineRenderer {
             let bind_group1 = self.create_group1(device, line);
             render_pass.set_bind_group(1, &bind_group1, &[]);
             // TODO * 2 or * 4
-            render_pass.draw(0..(line.data.len() * 2) as u32, 0..1);
+            render_pass.draw(0..6, 0..line.data.len() as u32);
         }
     }
 }
@@ -116,6 +112,7 @@ fn to_buffer<T>(device: &wgpu::Device, value: &T) -> wgpu::Buffer
 where
     T: Pod + Zeroable + std::fmt::Debug,
 {
+    println!("{:?}", value);
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Line Thickness Buffer"),
         contents: bytemuck::bytes_of(value),

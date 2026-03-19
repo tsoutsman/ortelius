@@ -69,11 +69,11 @@ impl Default for PlotLayout {
             initial_bounds: Some(Bounds {
                 x: Interval {
                     min: 0.0,
-                    max: 10000.,
+                    max: 200.,
                 },
                 y: Interval {
-                    min: -20.0,
-                    max: 20.,
+                    min: -5.0,
+                    max: 5.,
                 },
             }),
             interaction_bounds: Bounds::INFINITY,

@@ -29,9 +29,39 @@ fn vs_main(
     let p_curr = (scene.projection_matrix * vec4<f32>(points[point_index], 0.0, 1.0)).xy;
     let p_next = (scene.projection_matrix * vec4<f32>(points[min(arrayLength(&points) - 1u, point_index + 1u)], 0.0, 1.0)).xy;
 
-    // Calculate direction vectors and their normals
-    let dir_in = normalize(p_curr - p_prev);
-    let dir_out = normalize(p_next - p_curr);
+    // // Calculate direction vectors and their normals
+    // let dir_in = normalize(p_curr - p_prev);
+    // let dir_out = normalize(p_next - p_curr);
+    // let normal_in = vec2<f32>(-dir_in.y, dir_in.x);
+    // let normal_out = vec2<f32>(-dir_out.y, dir_out.x);
+
+    // Calculate raw direction vectors
+    var raw_dir_in = p_curr - p_prev;
+    var raw_dir_out = p_next - p_curr;
+
+    // 1. Fix the endpoints: copy the valid direction so the caps are square
+    if (point_index == 0u) {
+        raw_dir_in = raw_dir_out; 
+    }
+    if (point_index >= arrayLength(&points) - 1u) {
+        raw_dir_out = raw_dir_in; 
+    }
+
+    // 2. Safely normalize to prevent crashes from duplicate points
+    var dir_in = raw_dir_in;
+    if (length(dir_in) > 0.0001) { 
+        dir_in = normalize(dir_in); 
+    } else { 
+        dir_in = vec2<f32>(1.0, 0.0); // Arbitrary fallback
+    }
+
+    var dir_out = raw_dir_out;
+    if (length(dir_out) > 0.0001) { 
+        dir_out = normalize(dir_out); 
+    } else { 
+        dir_out = vec2<f32>(1.0, 0.0); 
+    }
+
     let normal_in = vec2<f32>(-dir_in.y, dir_in.x);
     let normal_out = vec2<f32>(-dir_out.y, dir_out.x);
 
@@ -39,8 +69,8 @@ fn vs_main(
     let miter_vec = normalize(normal_in + normal_out);
 
     // Calculate the miter length to prevent the line from getting thicker at sharp angles
-    let miter_len = 1.0 / dot(miter_vec, normal_in);
-    // let miter_len = min(1.0 / dot(miter_vec, normal_in), 2.5); // Clamp the miter length
+    // let miter_len = 1.0 / dot(miter_vec, normal_in);
+    let miter_len = min(1.0 / dot(miter_vec, normal_in), 2.5); // Clamp the miter length
 
 
     // Calculate the final position by extruding the current point along the miter vector

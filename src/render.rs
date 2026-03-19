@@ -1,7 +1,9 @@
 mod line;
+mod scatter;
 
 use bytemuck::{Pod, Zeroable};
 use line::LineRenderer;
+use scatter::ScatterRenderer;
 use vello::wgpu::{
     self, CommandEncoder, Device, Queue, Surface, SurfaceConfiguration, TextureFormat, TextureView,
 };
@@ -20,6 +22,7 @@ pub(crate) struct SceneParams {
 
 pub struct Renderer<'a> {
     line: LineRenderer,
+    scatter: ScatterRenderer,
     surface: Surface<'a>,
     device: Device,
     msaa_view: TextureView,
@@ -61,6 +64,7 @@ impl<'a> Renderer<'a> {
 
         Self {
             line: LineRenderer::new(&device),
+            scatter: ScatterRenderer::new(&device),
             device,
             msaa_view: msaa_texture,
             surface,
@@ -142,7 +146,14 @@ impl<'a> Renderer<'a> {
                 scene_params,
                 lines.into_iter(),
             ),
-            Layer::Scatter => todo!(),
+            Layer::Scatter(scatter) => self.scatter.render(
+                &self.device,
+                encoder,
+                view,
+                &self.msaa_view,
+                scene_params,
+                std::iter::once(scatter),
+            ),
         }
     }
 }
