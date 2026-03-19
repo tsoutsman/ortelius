@@ -61,12 +61,21 @@ impl Default for PlotLayout {
             width: 800.0,
             height: 600.0,
             padding: Padding {
-                top: 20.0,
-                bottom: 20.0,
-                left: 50.0,
-                right: 20.0,
+                top: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+                right: 0.0,
             },
-            initial_bounds: None,
+            initial_bounds: Some(Bounds {
+                x: Interval {
+                    min: 0.0,
+                    max: 10000.,
+                },
+                y: Interval {
+                    min: -20.0,
+                    max: 20.,
+                },
+            }),
             interaction_bounds: Bounds::INFINITY,
         }
     }
@@ -93,16 +102,27 @@ impl PlotInstanceLayout {
         let height = y.size() as f32;
 
         SceneParams {
+            // projection_matrix: [
+            //     [2. / width, 0., 0., -(x.min + x.max) as f32 / width],
+            //     [0., 2. / height, 0., -(y.min + y.max) as f32 / height],
+            //     [0., 0., 0., 0.],
+            //     [0., 0., 0., 1.],
+            // ],
+            // WEBGPU is column major :)
             projection_matrix: [
-                [2. / width, 0., 0., -(x.min + x.max) as f32 / width],
-                [0., 2. / height, 0., -(y.min + y.max) as f32 / height],
-                [0., 0., 0., 0.],
-                [0., 0., 0., 1.],
+                // Column 0
+                [2. / width, 0., 0., 0.], 
+                // Column 1
+                [0., 2. / height, 0., 0.], 
+                // Column 2
+                [0., 0., 0., 0.], 
+                // Column 3 (Translation goes here!)
+                [-(x.min + x.max) as f32 / width, -(y.min + y.max) as f32 / height, 0., 1.],
             ],
             // TODO
             xclip_bounds: [0., 100.],
             // TODO
-            yclip_bounds: [0., 100.],
+            yclip_bounds: [0., 10.],
             viewport_size: [self.logical_width as f32, self.logical_height as f32],
             _padding: [0., 0.],
         }

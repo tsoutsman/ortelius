@@ -40,8 +40,18 @@ pub(super) fn group1_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
+                    min_binding_size: Some(std::num::NonZeroU64::new(16).unwrap()),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
                     min_binding_size: Some(
-                        std::num::NonZeroU64::new(std::mem::size_of::<f32>() as u64).unwrap(),
+                        std::num::NonZeroU64::new(std::mem::size_of::<[f32; 4]>() as u64).unwrap(),
                     ),
                 },
                 count: None,
@@ -75,32 +85,35 @@ pub(super) fn render_pipeline(
     pipeline_layout: &wgpu::PipelineLayout,
     is_miter: bool,
 ) -> wgpu::RenderPipeline {
-    // let (vertex_shader, fragment_shader) = if is_miter {
-    //     (
-    //         device
-    //
-    // .create_shader_module(wgpu::include_wgsl!("../shader/line/miter/vertex.wgsl"
-    // )),         device.create_shader_module(wgpu::include_wgsl!(
-    //             "../shader/line/miter/fragment.wgsl"
-    //         )),
-    //     )
-    // } else {
-    let shader =
-        device.create_shader_module(wgpu::include_wgsl!("../../../shader/line/round.wgsl"));
-    // };
+    // TODO
+    let is_miter = true;
+    let (vertex_shader, fragment_shader) = if is_miter {
+        (
+            device.create_shader_module(wgpu::include_wgsl!(
+                "../../../shader/line/miter/vertex.wgsl"
+            )),
+            device.create_shader_module(wgpu::include_wgsl!(
+                "../../../shader/line/miter/fragment.wgsl"
+            )),
+        )
+    } else {
+        panic!();
+        let shader =
+            device.create_shader_module(wgpu::include_wgsl!("../../../shader/line/round.wgsl"));
+    };
 
     let sample_count = 4;
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Line Render Pipeline"),
         layout: Some(pipeline_layout),
         vertex: wgpu::VertexState {
-            module: &shader,
+            module: &vertex_shader,
             entry_point: Some("vs_main"),
             buffers: &[],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
-            module: &shader,
+            module: &fragment_shader,
             entry_point: Some("fs_main"),
             targets: &[Some(wgpu::ColorTargetState {
                 // format: config.format,

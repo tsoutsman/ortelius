@@ -31,11 +31,7 @@ impl LineRenderer {
         }
     }
 
-    fn create_group0(
-        &self,
-        device: &wgpu::Device,
-        scene_params: SceneParams,
-    ) -> wgpu::BindGroup {
+    fn create_group0(&self, device: &wgpu::Device, scene_params: SceneParams) -> wgpu::BindGroup {
         let scene_buffer = to_buffer(device, &scene_params);
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Line Bind Group 0"),
@@ -48,7 +44,9 @@ impl LineRenderer {
     }
 
     fn create_group1(&self, device: &wgpu::Device, line: Line<'_>) -> wgpu::BindGroup {
-        let thickness_buffer = to_buffer(device, &line.thickness);
+        let thickness_buffer = to_buffer(device, &[line.thickness, 0., 0., 0.]);
+        println!("line.thickness: {}", line.thickness);
+        let colour_buffer = to_buffer(device, &line.colour);
 
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Line Bind Group 1"),
@@ -61,6 +59,10 @@ impl LineRenderer {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: thickness_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: colour_buffer.as_entire_binding(),
                 },
             ],
         })
@@ -99,6 +101,8 @@ impl LineRenderer {
 
         render_pass.set_pipeline(&self.render_pipeline);
 
+        println!("scene_params: {:?}", scene_params);
+
         let bind_group0 = self.create_group0(device, scene_params);
         render_pass.set_bind_group(0, &bind_group0, &[]);
 
@@ -113,8 +117,9 @@ impl LineRenderer {
 
 fn to_buffer<T>(device: &wgpu::Device, value: &T) -> wgpu::Buffer
 where
-    T: Pod + Zeroable,
+    T: Pod + Zeroable + std::fmt::Debug,
 {
+    println!("{:?}", value);
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Line Thickness Buffer"),
         contents: bytemuck::bytes_of(value),

@@ -17,7 +17,7 @@ pub enum Layer<'a> {
 pub struct Line<'a> {
     pub data: &'a LineBuffer,
     pub thickness: f32,
-    pub colour: f32,
+    pub colour: [f32; 4],
 }
 
 #[derive(Debug)]

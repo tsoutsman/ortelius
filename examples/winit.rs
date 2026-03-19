@@ -7,8 +7,8 @@ use ortelius::{
 use rand_distr::{Distribution, StandardNormal};
 use vello::wgpu;
 
-const NUM_WALKS: usize = 3;
-const NUM_STARTING_POINTS: usize = 1000;
+const NUM_WALKS: usize = 6;
+const NUM_STARTING_POINTS: usize = 5000;
 const NEW_POINT_PERIOD: Duration = Duration::from_millis(20);
 
 // How many points to show in the plot.
@@ -17,6 +17,19 @@ const _XWINDOW_SIZE: usize = 200;
 // Whether to limit the interaction bounds to the lines.
 const _INTERACTION_BOUNDS: bool = true;
 const _AUTO_SCROLL: bool = true;
+
+pub const COLOURS: [[f32; 4]; 10] = [
+    [0.90, 0.10, 0.10, 1.0], // 0: Crimson Red
+    [0.10, 0.50, 0.90, 1.0], // 1: Dodger Blue
+    [0.10, 0.80, 0.20, 1.0], // 2: Emerald Green
+    [0.95, 0.70, 0.00, 1.0], // 3: Golden Yellow
+    [0.60, 0.10, 0.80, 1.0], // 4: Deep Purple
+    [0.00, 0.80, 0.80, 1.0], // 5: Cyan / Teal
+    [0.95, 0.40, 0.00, 1.0], // 6: Vibrant Orange
+    [0.90, 0.30, 0.60, 1.0], // 7: Hot Pink
+    [0.60, 0.90, 0.10, 1.0], // 8: Lime Green
+    [0.85, 0.85, 0.85, 1.0], // 9: Light Silver/Gray (Good for neutral/grid lines)
+];
 
 fn main() {
     let mut walks = vec![];
@@ -39,6 +52,7 @@ fn main() {
                         .into_iter()
                         .map(|(x, y)| (x + 1., get_next_step(y)))
                         .collect();
+                    println!("sending event: {:?}", current);
                     channel.send_event(current.clone()).unwrap();
                 }
             });
@@ -77,10 +91,11 @@ impl ortelius::State for State {
         vec![Layer::Lines(
             self.line_buffers
                 .iter()
-                .map(|buffer| layer::Line {
+                .enumerate()
+                .map(|(i,buffer)| layer::Line {
                     data: buffer,
                     thickness: 2.,
-                    colour: 1.,
+                    colour: COLOURS[i],
                 })
                 .collect(),
         )]

@@ -1,6 +1,9 @@
 struct SceneParams {
-    scale: vec2<f32>,
-    offset: vec2<f32>,
+    projection_matrix: mat4x4<f32>,
+    xclip_bounds: vec2<f32>,
+    yclip_bounds: vec2<f32>,
+    viewport_size: vec2<f32>,
+    _padding: vec2<f32>,
 };
 
 @group(0) @binding(0) var<uniform> scene: SceneParams;
@@ -12,7 +15,8 @@ struct SceneParams {
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
 ) -> @builtin(position) vec4<f32> {
-    let half_width = thickness / 2.0;
+    // let half_width = thickness / 2.0;
+    let half_width = 0.004;
 
     // Each point in our list becomes two vertices in the strip (a top and bottom one)
     let point_index = vertex_index / 2u;
@@ -21,9 +25,9 @@ fn vs_main(
 
     // Get the current, previous, and next points to determine the angle of the join.
     // Clamp indices to handle the start and end of the line gracefully.
-    let p_prev = points[max(0, i32(point_index) - 1)];// * scene.scale + scene.offset;
-    let p_curr = points[point_index];// * scene.scale + scene.offset;
-    let p_next = points[min(arrayLength(&points) - 1u, point_index + 1u)];// * scene.scale + scene.offset;
+    let p_prev = (scene.projection_matrix * vec4<f32>(points[max(0, i32(point_index) - 1)], 0.0, 1.0)).xy;
+    let p_curr = (scene.projection_matrix * vec4<f32>(points[point_index], 0.0, 1.0)).xy;
+    let p_next = (scene.projection_matrix * vec4<f32>(points[min(arrayLength(&points) - 1u, point_index + 1u)], 0.0, 1.0)).xy;
 
     // Calculate direction vectors and their normals
     let dir_in = normalize(p_curr - p_prev);
