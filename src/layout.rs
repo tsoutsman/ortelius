@@ -43,22 +43,12 @@ impl PlotLayout {
         self
     }
 
-    pub(crate) fn instantiate(
-        self,
-        window: &Window,
-        initial_data_bounds: Option<Bounds>,
-    ) -> PlotInstanceLayout {
-        let data_bounds = if let Some(initial_bounds) = self.initial_bounds {
-            initial_bounds
-        } else {
-            initial_data_bounds.unwrap_or(Bounds::UNIT)
-        };
-
+    pub(crate) fn instantiate(self, window: &Window) -> PlotInstanceLayout {
         PlotInstanceLayout {
             logical_width: self.width,
             logical_height: self.height,
             padding: self.padding,
-            data_bounds,
+            data_bounds: self.initial_bounds.unwrap_or(Bounds::UNIT),
             interaction_bounds: self.interaction_bounds,
             scale_factor: window.scale_factor(),
         }
@@ -83,7 +73,7 @@ impl Default for PlotLayout {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct PlotInstanceLayout {
+pub struct PlotInstanceLayout {
     pub(crate) logical_width: f64,
     pub(crate) logical_height: f64,
     pub(crate) padding: Padding,
@@ -95,7 +85,7 @@ pub(crate) struct PlotInstanceLayout {
 }
 
 impl PlotInstanceLayout {
-    pub fn scene_params(&self) -> SceneParams {
+    pub(crate) fn scene_params(&self) -> SceneParams {
         let x = self.data_bounds.x;
         let y = self.data_bounds.y;
 
@@ -165,13 +155,13 @@ impl PlotInstanceLayout {
         }
     }
 
-    pub(crate) fn resize(&mut self, width: u32, height: u32) {
+    pub fn resize(&mut self, width: u32, height: u32) {
         // TODO: use u32 internally as well
         self.logical_width = width as f64 / self.scale_factor;
         self.logical_height = height as f64 / self.scale_factor;
     }
 
-    pub(crate) fn drag(
+    pub fn drag(
         &mut self,
         start_drag_mouse_position: (f64, f64),
         pre_position: (f64, f64),
@@ -202,7 +192,7 @@ impl PlotInstanceLayout {
         //println!("{:?} {:?}", start_drag_mouse_position, current_position);
     }
 
-    pub(crate) fn zoom(&mut self, mouse_position: (f64, f64), factor: f64) {
+    pub fn zoom(&mut self, mouse_position: (f64, f64), factor: f64) {
         if let Some(data_position) = self.convert_to_data_position(mouse_position) {
             self.data_bounds = Bounds {
                 x: Interval {

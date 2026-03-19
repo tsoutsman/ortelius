@@ -9,6 +9,7 @@ pub fn pad_size(size: u64) -> u64 {
     ((size + align_mask) & !align_mask).max(COPY_BUFFER_ALIGNMENT)
 }
 
+#[derive(Debug)]
 pub struct GpuBuffer<T> {
     length: usize,
     capacity: u64,

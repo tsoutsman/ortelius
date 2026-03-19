@@ -1,29 +1,36 @@
 mod buffer;
-mod layer;
-mod layout;
+pub mod layer;
+pub mod layout;
 mod render;
 mod winit;
 
-use crate::buffer::GpuBuffer;
-pub use crate::{
-    layer::{Layer, LayerSpecification, LineSpecification},
-    layout::{Bounds, Padding, PlotLayout},
-    winit::{Update, UpdateKind},
+use vello::wgpu;
+
+pub use crate::winit::Channel;
+use crate::{
+    layer::Layer,
+    layout::{PlotInstanceLayout, PlotLayout},
 };
 
-type Channel = ::winit::event_loop::EventLoopProxy<Update>;
+pub trait State {
+    type Event: 'static;
 
-trait State {
-    type Event;
+    fn layers(&self) -> Vec<Layer>;
 
-    fn update(&mut self, event: Self::Event);
-
-    fn plot(&self) -> PlotLayout;
+    fn update(&mut self, event: Self::Event, device: &wgpu::Device, queue: &wgpu::Queue) {
+        let _ = (event, device, queue);
+    }
 }
 
-pub fn plot<F>(layout: PlotLayout, layers: Vec<LayerSpecification>, f: F)
+pub fn plot<S, F, G>(state_constructor: F, layout: PlotLayout, channel_storer: G)
 where
-    F: FnOnce(Channel),
+    S: State,
+    F: FnOnce(&wgpu::Device, &wgpu::Queue) -> S + 'static,
+    G: FnOnce(Channel<S::Event>),
 {
-    winit::App::new(layout, layers).display(f);
+    winit::App::new(state_constructor, layout).plot(channel_storer);
+}
+
+pub fn save_png(_layers: Vec<Layer>, _layout: PlotLayout, _path: &str) -> std::io::Result<()> {
+    todo!();
 }

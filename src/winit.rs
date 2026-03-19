@@ -1,6 +1,11 @@
-use std::{mem, sync::Arc};
+use std::{marker::PhantomData, mem, sync::Arc};
 
-use vello::{kurbo::Point, util::RenderContext, wgpu};
+pub use ::winit::event_loop::EventLoopProxy as Channel;
+use vello::{
+    kurbo::Point,
+    util::RenderContext,
+    wgpu::{Device, Queue},
+};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
@@ -10,38 +15,26 @@ use winit::{
     window::Window,
 };
 
-use crate::{
-    layer::{Layer, LayerSpecification},
-    layout::{PlotInstanceLayout, PlotLayout},
-    render::Renderer,
-};
+use crate::{PlotInstanceLayout, PlotLayout, State, render::Renderer};
 
 #[allow(clippy::large_enum_variant)]
-pub(crate) enum App<'s> {
+pub(crate) enum App<'s, S>
+where
+    S: State,
+{
     Uninitialized {
+        // TODO: Explain why we need option.
+        state_constructor: Option<Box<dyn FnOnce(&Device, &Queue) -> S>>,
         layout: PlotLayout,
-        layers: Vec<LayerSpecification>,
     },
     Initialized {
-        layout: PlotInstanceLayout,
-        layers: Vec<Layer>,
-
+        state: S,
         window: Arc<Window>,
         input: Input,
         renderer: Renderer<'s>,
+        layout: PlotInstanceLayout,
+        _phantom: PhantomData<S>,
     },
-}
-
-pub struct Update {
-    layer: usize,
-    line: Option<usize>,
-    kind: UpdateKind,
-}
-
-pub enum UpdateKind {
-    Append { x: f32, y: f32 },
-    Extend { xs: Vec<f32>, ys: Vec<f32> },
-    Set { xs: Vec<f32>, ys: Vec<f32> },
 }
 
 #[derive(Debug, Default, Clone)]
@@ -51,14 +44,23 @@ pub(crate) struct Input {
     prior_position: Option<Point>,
 }
 
-impl<'s> App<'s> {
-    pub(crate) fn new(layout: PlotLayout, layers: Vec<LayerSpecification>) -> Self {
-        Self::Uninitialized { layout, layers }
+impl<'s, S> App<'s, S>
+where
+    S: State,
+{
+    pub(crate) fn new<F>(state_constructor: F, layout: PlotLayout) -> Self
+    where
+        F: FnOnce(&Device, &Queue) -> S + 'static,
+    {
+        Self::Uninitialized {
+            state_constructor: Some(Box::new(state_constructor)),
+            layout,
+        }
     }
 
-    pub(crate) fn display<F>(&mut self, f: F)
+    pub(crate) fn plot<F>(&mut self, f: F)
     where
-        F: FnOnce(crate::Channel),
+        F: FnOnce(Channel<S::Event>),
     {
         let event_loop = EventLoop::with_user_event().build().unwrap();
         f(event_loop.create_proxy());
@@ -66,38 +68,20 @@ impl<'s> App<'s> {
     }
 }
 
-impl ApplicationHandler<Update> for App<'_> {
-    fn user_event(&mut self, _: &ActiveEventLoop, update: Update) {
+impl<S> ApplicationHandler<S::Event> for App<'_, S>
+where
+    S: State,
+{
+    fn user_event(&mut self, _: &ActiveEventLoop, update: S::Event) {
         match self {
             App::Uninitialized { .. } => todo!(),
             App::Initialized {
-                layers,
+                state,
                 window,
                 renderer,
                 ..
             } => {
-                let layer = layers.get_mut(update.layer).unwrap();
-                if let Some(line) = update.line {
-                    if let Layer::Lines(lines) = layer {
-                        let line = lines.get_mut(line).unwrap();
-                        let device = renderer.device();
-
-                        let command_buffer = match update.kind {
-                            UpdateKind::Append { x, y } => line.append(device, x, y),
-                            UpdateKind::Extend { xs, ys } => line.extend(device, &xs, &ys),
-                            UpdateKind::Set { .. } => todo!(),
-                        };
-
-                        renderer.queue().submit([command_buffer]);
-                        // TODO: do we have to do this?
-                        device.poll(wgpu::PollType::Poll).unwrap();
-                    } else {
-                        panic!("specified line index for non-line layer");
-                    }
-                } else {
-                    todo!();
-                }
-
+                state.update(update, renderer.device(), renderer.queue());
                 // TODO: only redraw if new data in viewport.
                 window.request_redraw();
             }
@@ -106,7 +90,10 @@ impl ApplicationHandler<Update> for App<'_> {
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         match self {
-            App::Uninitialized { layout, layers } => {
+            App::Uninitialized {
+                state_constructor,
+                layout,
+            } => {
                 let window = Arc::new(
                     event_loop
                         .create_window(
@@ -129,28 +116,25 @@ impl ApplicationHandler<Update> for App<'_> {
                     context.create_surface(window.clone(), size.width, size.height, present_mode);
                 let surface = pollster::block_on(surface_future).expect("Error creating surface");
 
-                // TODO
-                let initial_data_bounds = None;
-                // TODO: don't clone
-                let layout = layout.clone().instantiate(&window, initial_data_bounds);
-
                 window.request_redraw();
-
-                let mut layers_data = Vec::new();
-                mem::swap(&mut layers_data, layers);
 
                 let device = &context.devices[surface.dev_id].device;
                 let queue = &context.devices[surface.dev_id].queue;
+
+                let mut new_state_constructor = None;
+                mem::swap(&mut new_state_constructor, state_constructor);
+
+                let mut new_layout = PlotLayout::new();
+                mem::swap(&mut new_layout, layout);
+
                 *self = App::Initialized {
+                    state: new_state_constructor.unwrap()(device, queue),
+                    layout: new_layout.instantiate(&window),
                     window,
                     input: Input::default(),
-                    layout,
                     // TODO: don't clone
                     renderer: Renderer::new(device.clone(), queue.clone(), surface.surface),
-                    layers: layers_data
-                        .into_iter()
-                        .map(|spec| spec.init(device))
-                        .collect(),
+                    _phantom: PhantomData,
                 };
             }
             App::Initialized { .. } => {}
@@ -166,11 +150,12 @@ impl ApplicationHandler<Update> for App<'_> {
         match self {
             App::Uninitialized { .. } => {}
             App::Initialized {
+                state,
+                layout,
                 window,
                 input,
-                layout,
                 renderer,
-                layers,
+                _phantom,
             } => {
                 if window.id() != window_id {
                     return;
@@ -208,9 +193,11 @@ impl ApplicationHandler<Update> for App<'_> {
                     WindowEvent::MouseWheel { delta, .. } => {
                         let factor = match delta {
                             winit::event::MouseScrollDelta::LineDelta(_, y) => {
+                                // TODO
                                 1.0 + y as f64 / 10.0
                             }
                             winit::event::MouseScrollDelta::PixelDelta(delta) => {
+                                // TODO
                                 1.0 + delta.y / 500.0
                             }
                         };
@@ -240,7 +227,7 @@ impl ApplicationHandler<Update> for App<'_> {
                         input.prior_position = Some(position);
                     }
                     WindowEvent::RedrawRequested => {
-                        renderer.render(layers.iter(), layout);
+                        renderer.render(state.layers().into_iter(), layout);
                     }
                     _ => {}
                 }

@@ -1,56 +1,68 @@
 mod line;
 
-use vello::wgpu::{self, BufferUsages, CommandBuffer, Device};
+use vello::wgpu::{self, CommandBuffer};
 
-use crate::GpuBuffer;
+use crate::buffer::GpuBuffer;
 
+#[derive(Debug, Clone)]
 pub enum Layer<'a> {
     Title(&'a str),
     XAxis { label: Option<&'a str> },
     YAxis { label: Option<&'a str> },
-    Lines(Vec<Line>),
+    Lines(Vec<Line<'a>>),
     Scatter,
 }
 
-pub struct Line {
-    pub(crate) thickness: f32,
-    pub(crate) colour: f32,
+#[derive(Debug, Clone, Copy)]
+pub struct Line<'a> {
+    pub data: &'a LineBuffer,
+    pub thickness: f32,
+    pub colour: f32,
 }
 
-impl Line {
-    pub fn new(device: &wgpu::Device, xs: &[f32], ys: &[f32]) -> Self {
-        assert_eq!(xs.len(), ys.len(), "xs and ys must have the same length");
-        let usage = BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC;
+#[derive(Debug)]
+pub struct LineBuffer {
+    inner: GpuBuffer<f32>,
+}
 
-        Line {
-            buffer: GpuBuffer::new(device, usage, 2 * xs.len(), |buffer| {
-                for i in 0..xs.len() {
-                    buffer[i * 2] = xs[i];
-                    buffer[i * 2 + 1] = ys[i];
-                }
-            }),
-            thickness: 0.005,
-            colour: 0.,
+impl LineBuffer {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
+            inner: GpuBuffer::new(
+                device,
+                // TODO
+                wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST
+                    | wgpu::BufferUsages::STORAGE,
+                0,
+                |_| {},
+            ),
         }
     }
 
-    #[must_use]
-    pub fn append(&mut self, device: &wgpu::Device, x: f32, y: f32) -> CommandBuffer {
-        self.buffer.extend(device, 2, |buffer| {
-            buffer[0] = x;
-            buffer[1] = y;
-        })
+    pub fn len(&self) -> usize {
+        self.inner.len() / 2
     }
 
     #[must_use]
-    pub fn extend(&mut self, device: &wgpu::Device, xs: &[f32], ys: &[f32]) -> CommandBuffer {
+    pub fn append(&mut self, x: f32, y: f32, device: &wgpu::Device) -> CommandBuffer {
+        self.extend(&[x], &[y], device)
+    }
+
+    #[must_use]
+    pub fn extend(&mut self, xs: &[f32], ys: &[f32], device: &wgpu::Device) -> CommandBuffer {
         assert_eq!(xs.len(), ys.len(), "xs and ys must have the same length");
 
-        self.buffer.extend(device, 2 * xs.len(), |buffer| {
-            for i in 0..xs.len() {
+        let len = xs.len();
+        self.inner.extend(device, len * 2, |buffer| {
+            for i in 0..len {
                 buffer[i * 2] = xs[i];
                 buffer[i * 2 + 1] = ys[i];
             }
         })
+    }
+
+    pub fn as_entire_binding(&self) -> wgpu::BindingResource {
+        self.inner.as_entire_binding()
     }
 }

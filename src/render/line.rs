@@ -47,7 +47,7 @@ impl LineRenderer {
         })
     }
 
-    fn create_group1(&self, device: &wgpu::Device, line: &Line) -> wgpu::BindGroup {
+    fn create_group1(&self, device: &wgpu::Device, line: Line<'_>) -> wgpu::BindGroup {
         let thickness_buffer = to_buffer(device, &line.thickness);
 
         device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -56,7 +56,7 @@ impl LineRenderer {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: line.buffer.as_entire_binding(),
+                    resource: line.data.as_entire_binding(),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -75,7 +75,7 @@ impl LineRenderer {
         scene_params: SceneParams,
         lines: I,
     ) where
-        I: Iterator<Item = &'a Line>,
+        I: Iterator<Item = Line<'a>>,
     {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Line Render Pass"),
@@ -105,7 +105,8 @@ impl LineRenderer {
         for line in lines {
             let bind_group1 = self.create_group1(device, line);
             render_pass.set_bind_group(1, &bind_group1, &[]);
-            render_pass.draw(0..(line.buffer.len() * 2) as u32, 0..1);
+            // TODO * 2 or * 4
+            render_pass.draw(0..(line.data.len() * 2 * 2) as u32, 0..1);
         }
     }
 }

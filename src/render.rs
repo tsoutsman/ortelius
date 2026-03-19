@@ -101,7 +101,7 @@ impl<'a> Renderer<'a> {
 
     pub(crate) fn render<'b, I>(&self, layers: I, layout: &PlotInstanceLayout)
     where
-        I: Iterator<Item = &'b Layer>,
+        I: Iterator<Item = Layer<'b>>,
     {
         let mut encoder = self
             .device
@@ -125,7 +125,7 @@ impl<'a> Renderer<'a> {
 
     fn render_layer(
         &self,
-        layer: &Layer,
+        layer: Layer,
         encoder: &mut CommandEncoder,
         view: &TextureView,
         scene_params: SceneParams,
@@ -140,7 +140,7 @@ impl<'a> Renderer<'a> {
                 view,
                 &self.msaa_view,
                 scene_params,
-                lines.iter(),
+                lines.into_iter(),
             ),
             Layer::Scatter => todo!(),
         }
