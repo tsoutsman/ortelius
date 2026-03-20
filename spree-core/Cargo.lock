@@ -1226,19 +1226,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ortelius"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "itertools",
- "pollster",
- "rand",
- "rand_distr",
- "vello",
- "winit",
-]
-
-[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1723,6 +1710,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
 dependencies = [
  "bitflags 2.11.0",
+]
+
+[[package]]
+name = "spree"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "itertools",
+ "pollster",
+ "rand",
+ "rand_distr",
+ "vello",
+ "winit",
 ]
 
 [[package]]
