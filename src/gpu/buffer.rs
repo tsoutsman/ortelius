@@ -1,7 +1,6 @@
 use bytemuck::Pod;
 use vello::wgpu::{
-    self, BindingResource, BufferUsages, COPY_BUFFER_ALIGNMENT, CommandBuffer,
-    CommandEncoder,
+    self, BindingResource, BufferUsages, COPY_BUFFER_ALIGNMENT, CommandBuffer, CommandEncoder,
 };
 
 pub fn pad_size(size: u64) -> u64 {
@@ -76,6 +75,10 @@ where
         (self.length * std::mem::size_of::<T>()) as u64
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
+    }
+
     #[inline]
     #[must_use]
     fn grow(&mut self, device: &wgpu::Device, required_size: u64) -> CommandEncoder {
@@ -144,7 +147,7 @@ where
 
     #[inline]
     #[must_use]
-    pub fn as_entire_binding(&self) -> BindingResource<'_> {
+    pub(crate) fn as_entire_binding(&self) -> BindingResource<'_> {
         self.inner.as_entire_binding()
     }
 }

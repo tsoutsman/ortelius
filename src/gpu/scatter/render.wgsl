@@ -9,9 +9,16 @@ struct SceneParams {
 @group(0) @binding(0) var<uniform> scene: SceneParams;
 
 @group(1) @binding(0) var<storage, read> points: array<vec2<f32>>;
-@group(1) @binding(1) var<uniform> radius: f32;
 
-@group(1) @binding(2) var<uniform> colour: vec4<f32>;
+struct PerScatterParams {
+    colour: vec4<f32>,
+    radius: f32,
+    _pad_0: f32,
+    _pad_1: f32,
+    _pad_2: f32,
+}
+
+@group(1) @binding(1) var<uniform> scatter: PerScatterParams;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -45,7 +52,7 @@ fn vs_main(
     let aspect_ratio = scene.viewport_size.x / scene.viewport_size.y;
 
     // 4. Calculate the base offset
-    var offset = local_coord * radius;
+    var offset = local_coord * scatter.radius;
 
     // 5. Correct the X offset to counter the screen stretch
     offset.x = offset.x / aspect_ratio;
@@ -63,13 +70,15 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // 1. Calculate the distance from the center of the quad (0, 0)
     let dist = length(in.local_pos);
 
-    // 2. Discard any pixels outside the radius of 1.0
-    // Using smoothstep gives the dot nicely anti-aliased (soft) edges
-    let alpha = 1.0 - smoothstep(0.95, 1.0, dist);
+    // 2. Figure out exactly how thick 1 pixel is in this local coordinate space
+    let pixel_size = fwidth(dist);
+
+    // 3. Smooth over exactly 1 pixel width, ending right at the radius edge (1.0)
+    let alpha = 1.0 - smoothstep(1.0 - pixel_size, 1.0, dist);
     
     if (alpha < 0.01) {
-        discard; // Throw away the corners of the square
+        discard;
     }
 
-    return colour;
+    return vec4<f32>(scatter.colour.rgb, scatter.colour.a * alpha);
 }

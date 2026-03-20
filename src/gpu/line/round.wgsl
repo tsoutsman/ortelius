@@ -89,11 +89,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         h = clamp(dot(pa, ba) / ba_len_sq, 0.0, 1.0);
     }
     
-    // The actual distance from the pixel to the mathematical line
     let dist = length(pa - ba * h);
 
-    // 2. Smoothstep for nice anti-aliased edges
-    let alpha = 1.0 - smoothstep(radius * 0.95, radius, dist);
+    let pixel_size = fwidth(dist);
+    let alpha = 1.0 - smoothstep(radius - pixel_size, radius, dist);
     
     if (alpha < 0.01) {
         discard;

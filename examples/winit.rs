@@ -42,14 +42,11 @@ fn main() {
         walks_data.push(generate_random_walk(NUM_STARTING_POINTS, 0.));
     }
 
-    // current_state tracks (x, y, velocity) for the continuous loop
     let mut current_state = walks_data
         .iter()
         .map(|(xs, ys, v)| (*xs.last().unwrap(), *ys.last().unwrap(), *v))
         .collect::<Vec<_>>();
 
-    // Strip out the velocity component to pass pure (xs, ys) into the ortelius
-    // State
     let walks_for_plot: Vec<(Vec<f32>, Vec<f32>)> =
         walks_data.into_iter().map(|(xs, ys, _)| (xs, ys)).collect();
 
@@ -107,7 +104,7 @@ impl State {
 impl ortelius::State for State {
     type Event = Vec<(f32, f32)>;
 
-    fn layers(&self) -> Vec<Layer> {
+    fn layers(&self) -> Vec<Layer<'_>> {
         vec![
             Layer::Lines(
                 self.line_buffers
@@ -120,10 +117,11 @@ impl ortelius::State for State {
                     })
                     .collect(),
             ),
-            Layer::Scatter(layer::Scatter {
+            Layer::Scatters(vec![layer::Scatter {
                 data: self.line_buffers.first().unwrap(),
                 radius: 0.01,
-            }),
+                colour: [0., 0., 0., 1.],
+            }]),
         ]
     }
 
