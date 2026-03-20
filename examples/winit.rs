@@ -106,6 +106,11 @@ impl ortelius::State for State {
 
     fn layers(&self) -> Vec<Layer<'_>> {
         vec![
+            Layer::Grid(layer::Grid {
+                spacing: 20.,
+                thickness: 0.002,
+                axis_thickness: 0.004,
+            }),
             Layer::Lines(
                 self.line_buffers
                     .iter()

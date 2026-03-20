@@ -1,4 +1,5 @@
 mod buffer;
+mod grid;
 mod line;
 mod renderer;
 mod scatter;

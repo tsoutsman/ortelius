@@ -1,5 +1,6 @@
 struct SceneParams {
     projection_matrix: mat4x4<f32>,
+    inverse_projection_matrix: mat4x4<f32>,
     xclip_bounds: vec2<f32>,
     yclip_bounds: vec2<f32>,
     viewport_size: vec2<f32>,

@@ -71,10 +71,7 @@ impl Default for PlotLayout {
                     min: 0.0,
                     max: 200.,
                 },
-                y: Interval {
-                    min: -5.0,
-                    max: 5.,
-                },
+                y: Interval { min: -5.0, max: 5. },
             }),
             interaction_bounds: Bounds::INFINITY,
         }
@@ -101,24 +98,33 @@ impl PlotInstanceLayout {
         let width = x.size() as f32;
         let height = y.size() as f32;
 
-        SceneParams {
-            // projection_matrix: [
-            //     [2. / width, 0., 0., -(x.min + x.max) as f32 / width],
-            //     [0., 2. / height, 0., -(y.min + y.max) as f32 / height],
-            //     [0., 0., 0., 0.],
-            //     [0., 0., 0., 1.],
-            // ],
-            // WEBGPU is column major :)
-            projection_matrix: [
-                // Column 0
-                [2. / width, 0., 0., 0.], 
-                // Column 1
-                [0., 2. / height, 0., 0.], 
-                // Column 2
-                [0., 0., 0., 0.], 
-                // Column 3 (Translation goes here!)
-                [-(x.min + x.max) as f32 / width, -(y.min + y.max) as f32 / height, 0., 1.],
+        // WEBGPU is column major :)
+        let projection_matrix = [
+            [2. / width, 0., 0., 0.],
+            [0., 2. / height, 0., 0.],
+            [0., 0., 1., 0.],
+            [
+                -(x.min + x.max) as f32 / width,
+                -(y.min + y.max) as f32 / height,
+                0.,
+                1.,
             ],
+        ];
+        let inverse_projection_matrix = [
+            [width / 2.0, 0.0, 0.0, 0.0],
+            [0.0, height / 2.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [
+                (x.min + x.max) as f32 / 2.0,
+                (y.min + y.max) as f32 / 2.0,
+                0.0,
+                1.0,
+            ],
+        ];
+
+        SceneParams {
+            projection_matrix,
+            inverse_projection_matrix,
             // TODO
             xclip_bounds: [0., 100.],
             // TODO

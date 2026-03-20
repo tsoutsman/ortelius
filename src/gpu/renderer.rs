@@ -8,6 +8,7 @@ use crate::layout::PlotInstanceLayout;
 pub struct Renderer<'a> {
     line: Wrapper<super::line::Renderer>,
     scatter: Wrapper<super::scatter::Renderer>,
+    grid: Wrapper<super::grid::Renderer>,
     surface: Surface<'a>,
     device: Device,
     msaa_view: TextureView,
@@ -100,6 +101,7 @@ impl<'a> Renderer<'a> {
         Self {
             line: Wrapper::new(&device),
             scatter: Wrapper::new(&device),
+            grid: Wrapper::new(&device),
             device,
             msaa_view: msaa_texture,
             surface,
@@ -198,6 +200,14 @@ impl<'a> Renderer<'a> {
                 scene_params,
                 clear,
                 scatters.into_iter(),
+            ),
+            crate::Layer::Grid(grid) => self.usee(
+                &self.grid,
+                encoder,
+                view,
+                scene_params,
+                clear,
+                std::iter::once(grid),
             ),
         };
     }

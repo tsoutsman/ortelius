@@ -17,7 +17,7 @@ impl super::LayerRenderer for Renderer {
     type Layer<'a> = Scatter<'a>;
     type PerLayerParams = PerScatterParams;
 
-    const NAME: &'static str = "line";
+    const NAME: &'static str = "scatter";
 
     fn new() -> Self {
         Self {}

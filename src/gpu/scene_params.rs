@@ -7,6 +7,7 @@ use super::to_buffer;
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub(crate) struct SceneParams {
     pub(crate) projection_matrix: [[f32; 4]; 4],
+    pub(crate) inverse_projection_matrix: [[f32; 4]; 4],
     pub(crate) xclip_bounds: [f32; 2],
     pub(crate) yclip_bounds: [f32; 2],
     pub(crate) viewport_size: [f32; 2],
