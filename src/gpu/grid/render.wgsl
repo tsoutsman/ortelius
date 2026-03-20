@@ -1,20 +1,14 @@
 struct SceneParams {
     projection_matrix: mat4x4<f32>,
     inverse_projection_matrix: mat4x4<f32>,
-    xclip_bounds: vec2<f32>,
-    yclip_bounds: vec2<f32>,
-    viewport_size: vec2<f32>,
-    _padding: vec2<f32>,
 };
-
 @group(0) @binding(0) var<uniform> scene: SceneParams;
 
 struct Params {
-    grid_spacing: vec2<f32>,
-    grid_thickness: f32,
+    spacing: vec2<f32>,
+    thickness: f32,
     axis_thickness: f32,
 };
-
 @group(1) @binding(0) var<uniform> params: Params;
 
 struct VertexOutput {
@@ -53,9 +47,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let world_pos = in.world_pos;
     let pixel_size = fwidth(world_pos); 
 
-    // Wire up your uniform params instead of hardcoding them!
-    let grid_spacing = params.grid_spacing; 
-    let grid_thickness = params.grid_thickness; 
+    let grid_spacing = params.spacing; 
+    let grid_thickness = params.thickness; 
     let axis_thickness = params.axis_thickness; 
 
     let bg_color = vec4<f32>(0.98, 0.98, 0.98, 1.0);

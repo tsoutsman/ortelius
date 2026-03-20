@@ -1,12 +1,9 @@
 struct SceneParams {
     projection_matrix: mat4x4<f32>,
     inverse_projection_matrix: mat4x4<f32>,
-    xclip_bounds: vec2<f32>,
-    yclip_bounds: vec2<f32>,
     viewport_size: vec2<f32>,
     _padding: vec2<f32>,
 };
-
 @group(0) @binding(0) var<uniform> scene: SceneParams;
 
 struct PerLineParams {
@@ -16,7 +13,6 @@ struct PerLineParams {
     _pad_1: f32,
     _pad_2: f32,
 }
-
 @group(1) @binding(0) var<storage, read> points: array<vec2<f32>>;
 @group(1) @binding(1) var<uniform> line: PerLineParams;
 

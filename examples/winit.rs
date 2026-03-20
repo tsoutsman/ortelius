@@ -2,7 +2,7 @@ use std::{thread, time::Duration};
 
 use ortelius::{
     layer::{self, Layer, PointBuffer},
-    layout::PlotLayout,
+    layout::{PlotInstanceLayout, PlotLayout},
 };
 use rand_distr::{Distribution, StandardNormal};
 use vello::wgpu;
@@ -71,7 +71,6 @@ fn main() {
                     let current_points: Vec<(f32, f32)> =
                         current_state.iter().map(|(x, y, _)| (*x, *y)).collect();
 
-                    println!("sending event: {:?}", current_points);
                     channel.send_event(current_points).unwrap();
                 }
             });
@@ -101,15 +100,61 @@ impl State {
     }
 }
 
+/// Calculates a "nice" human-readable grid spacing based on the visible span.
+fn calculate_nice_spacing(min_val: f32, max_val: f32, target_lines: f32) -> f32 {
+    let span = max_val - min_val;
+
+    // Prevent division by zero or infinite math if bounds are broken
+    if span <= 0.0 {
+        return 1.0;
+    }
+
+    // 1. Calculate the raw, unrounded step size
+    let raw_step = span / target_lines;
+
+    // 2. Find the magnitude of the step (e.g., 0.1, 1, 10, 100)
+    let magnitude = 10.0_f32.powf(raw_step.log10().floor());
+
+    // 3. Normalize the raw step to a value between 1 and 10
+    let normalized_step = raw_step / magnitude;
+
+    // 4. Snap the normalized step to the nearest "nice" interval (1, 2, 5, or 10)
+    let nice_multiplier = if normalized_step < 1.5 {
+        1.0
+    } else if normalized_step < 3.0 {
+        2.0
+    } else if normalized_step < 7.0 {
+        5.0
+    } else {
+        10.0
+    };
+
+    // 5. Apply the magnitude back to get the final spacing
+    nice_multiplier * magnitude
+}
+
 impl ortelius::State for State {
     type Event = Vec<(f32, f32)>;
 
-    fn layers(&self) -> Vec<Layer<'_>> {
+    fn layers(&self, layout: &PlotInstanceLayout) -> Vec<Layer<'_>> {
+        let spacing = [
+            calculate_nice_spacing(
+                layout.data_bounds().x.min as f32,
+                layout.data_bounds().x.max as f32,
+                16.,
+            ),
+            calculate_nice_spacing(
+                layout.data_bounds().y.min as f32,
+                layout.data_bounds().y.max as f32,
+                9.,
+            ),
+        ];
+
         vec![
             Layer::Grid(layer::Grid {
-                spacing: 20.,
-                thickness: 0.002,
-                axis_thickness: 0.004,
+                spacing,
+                thickness: 1.,
+                axis_thickness: 3.,
             }),
             Layer::Lines(
                 self.line_buffers

@@ -6,8 +6,8 @@ use crate::layer::Grid;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Pod, Zeroable)]
 pub(super) struct Params {
-    grid_spacing: [f32; 2],
-    grid_thickness: f32,
+    spacing: [f32; 2],
+    thickness: f32,
     axis_thickness: f32,
 }
 
@@ -31,11 +31,11 @@ impl super::LayerRenderer for Renderer {
         (0..6, 0..1)
     }
 
-    fn create_per_layer_params<'a>(&self, _data: &Self::Layer<'a>) -> Self::PerLayerParams {
+    fn create_per_layer_params<'a>(&self, data: &Self::Layer<'a>) -> Self::PerLayerParams {
         Params {
-            grid_spacing: [10., 1.],
-            grid_thickness: 1.,
-            axis_thickness: 3.,
+            spacing: data.spacing,
+            thickness: data.thickness,
+            axis_thickness: data.axis_thickness,
         }
     }
 }

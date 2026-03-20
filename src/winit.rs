@@ -227,7 +227,7 @@ where
                         input.prior_position = Some(position);
                     }
                     WindowEvent::RedrawRequested => {
-                        renderer.render(state.layers().into_iter(), layout);
+                        renderer.render(state.layers(layout).into_iter(), layout);
                     }
                     _ => {}
                 }

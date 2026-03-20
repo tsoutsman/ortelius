@@ -91,6 +91,10 @@ pub struct PlotInstanceLayout {
 }
 
 impl PlotInstanceLayout {
+    pub fn data_bounds(&self) -> Bounds {
+        self.data_bounds
+    }
+
     pub(crate) fn scene_params(&self) -> SceneParams {
         let x = self.data_bounds.x;
         let y = self.data_bounds.y;
@@ -125,10 +129,6 @@ impl PlotInstanceLayout {
         SceneParams {
             projection_matrix,
             inverse_projection_matrix,
-            // TODO
-            xclip_bounds: [0., 100.],
-            // TODO
-            yclip_bounds: [0., 10.],
             viewport_size: [self.logical_width as f32, self.logical_height as f32],
             _padding: [0., 0.],
         }

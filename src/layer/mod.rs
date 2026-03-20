@@ -45,7 +45,8 @@ impl crate::gpu::Layer for Scatter<'_> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Grid {
-    pub spacing: f32,
+    // TODO: this uses pixel units instead of -1 1 units.
+    pub spacing: [f32; 2],
     pub thickness: f32,
     pub axis_thickness: f32,
 }
