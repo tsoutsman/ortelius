@@ -71,6 +71,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard; // Throw away the corners of the square
     }
 
-    // 3. Draw the dot (e.g., solid white)
     return colour;
 }

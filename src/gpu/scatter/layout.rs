@@ -1,6 +1,6 @@
 use vello::wgpu;
 
-use crate::render::SceneParams;
+use crate::gpu::SceneParams;
 
 pub(super) fn group0_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -66,7 +66,7 @@ pub(super) fn cull_pipeline(
     pipeline_layout: &wgpu::PipelineLayout,
 ) -> wgpu::ComputePipeline {
     let cull_shader =
-        device.create_shader_module(wgpu::include_wgsl!("../../../shader/line/cull.wgsl"));
+        device.create_shader_module(wgpu::include_wgsl!("cull.wgsl"));
 
     device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
         label: Some("Scatter Cull Pipeline"),
@@ -86,7 +86,7 @@ pub(super) fn render_pipeline(
     is_miter: bool,
 ) -> wgpu::RenderPipeline {
     let shader =
-        device.create_shader_module(wgpu::include_wgsl!("../../../shader/scatter/vertex.wgsl"));
+        device.create_shader_module(wgpu::include_wgsl!("vertex.wgsl"));
 
     let sample_count = 4;
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {

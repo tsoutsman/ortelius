@@ -3,7 +3,8 @@ mod layout;
 use bytemuck::{Pod, Zeroable};
 use vello::wgpu::{self, util::DeviceExt};
 
-use crate::{layer::Scatter, render::SceneParams};
+use super::SceneParams;
+use crate::layer::Scatter;
 
 pub(crate) struct ScatterRenderer {
     // _cull_pipeline: wgpu::ComputePipeline,

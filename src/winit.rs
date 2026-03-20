@@ -15,7 +15,7 @@ use winit::{
     window::Window,
 };
 
-use crate::{PlotInstanceLayout, PlotLayout, State, render::Renderer};
+use crate::{PlotInstanceLayout, PlotLayout, State, gpu::Renderer};
 
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum App<'s, S>

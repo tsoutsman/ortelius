@@ -2,7 +2,7 @@ mod line;
 
 use vello::wgpu::{self, CommandBuffer};
 
-use crate::buffer::GpuBuffer;
+use crate::gpu::GpuBuffer;
 
 #[derive(Debug, Clone)]
 pub enum Layer<'a> {
@@ -68,7 +68,7 @@ impl PointBuffer {
         })
     }
 
-    pub fn as_entire_binding(&self) -> wgpu::BindingResource {
+    pub fn as_entire_binding(&self) -> wgpu::BindingResource<'_> {
         self.inner.as_entire_binding()
     }
 }

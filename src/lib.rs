@@ -1,7 +1,6 @@
-mod buffer;
+mod gpu;
 pub mod layer;
 pub mod layout;
-mod render;
 mod winit;
 
 use vello::wgpu;
@@ -15,7 +14,7 @@ use crate::{
 pub trait State {
     type Event: 'static;
 
-    fn layers(&self) -> Vec<Layer>;
+    fn layers(&self) -> Vec<Layer<'_>>;
 
     fn update(&mut self, event: Self::Event, device: &wgpu::Device, queue: &wgpu::Queue) {
         let _ = (event, device, queue);

@@ -10,13 +10,13 @@ struct SceneParams {
 
 @group(1) @binding(0) var<storage, read> points: array<vec2<f32>>;
 @group(1) @binding(1) var<uniform> thickness: f32;
+@group(1) @binding(2) var<uniform> colour: vec4<f32>;
 
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
 ) -> @builtin(position) vec4<f32> {
-    // let half_width = thickness / 2.0;
-    let half_width = 0.004;
+    let half_width = thickness / 2.0;
 
     // Each point in our list becomes two vertices in the strip (a top and bottom one)
     let point_index = vertex_index / 2u;
@@ -52,7 +52,7 @@ fn vs_main(
     if (length(dir_in) > 0.0001) { 
         dir_in = normalize(dir_in); 
     } else { 
-        dir_in = vec2<f32>(1.0, 0.0); // Arbitrary fallback
+        dir_in = vec2<f32>(1.0, 0.0);
     }
 
     var dir_out = raw_dir_out;
@@ -70,7 +70,7 @@ fn vs_main(
 
     // Calculate the miter length to prevent the line from getting thicker at sharp angles
     // let miter_len = 1.0 / dot(miter_vec, normal_in);
-    let miter_len = min(1.0 / dot(miter_vec, normal_in), 2.5); // Clamp the miter length
+    let miter_len = min(1.0 / dot(miter_vec, normal_in), 2.5);
 
 
     // Calculate the final position by extruding the current point along the miter vector
@@ -79,4 +79,9 @@ fn vs_main(
     // pos[0] = pos[0] + 0.3 * side;
 
     return vec4<f32>(pos, 0.0, 1.0);
+}
+
+@fragment
+fn fs_main() -> @location(0) vec4<f32> {
+    return colour;
 }

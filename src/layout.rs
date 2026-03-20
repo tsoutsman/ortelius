@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign};
 
 use winit::window::Window;
 
-use crate::render::SceneParams;
+use crate::gpu::SceneParams;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlotLayout {
