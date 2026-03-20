@@ -12,23 +12,29 @@ pub(super) struct PerLineParams {
     _padding: [f32; 3],
 }
 
-pub(super) struct Temp {
+pub(super) struct Renderer {
     is_miter: bool,
 }
 
-impl super::Rendererr for Temp {
+impl super::LayerRenderer for Renderer {
     type Data<'a> = Line<'a>;
 
     type PerLayerBinding = PerLineParams;
 
     const NAME: &'static str = "line";
 
-    const SHADER: wgpu::ShaderModuleDescriptor<'static> = wgpu::include_wgsl!("round.wgsl");
-
     const USES_POINTS: bool = true;
 
     fn new() -> Self {
         Self { is_miter: false }
+    }
+
+    fn shader(&self) -> wgpu::ShaderModuleDescriptor<'static> {
+        if self.is_miter {
+            wgpu::include_wgsl!("miter.wgsl")
+        } else {
+            wgpu::include_wgsl!("round.wgsl")
+        }
     }
 
     fn counts(&self, data: &Self::Data<'_>) -> (std::ops::Range<u32>, std::ops::Range<u32>) {
@@ -50,7 +56,7 @@ impl super::Rendererr for Temp {
             thickness: data.thickness,
             _padding: [0., 0., 0.],
         };
-        let params_buffer = to_buffer(device, &params);
+        let params_buffer = to_buffer(device, "line bind group 1", &params);
 
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("line bind group 1"),

@@ -14,51 +14,60 @@ use vello::wgpu::{
 
 use crate::{Layer, layout::PlotInstanceLayout};
 
-struct Stuff<R>
+struct Wrapper<R>
 where
-    R: Rendererr,
+    R: LayerRenderer,
 {
     render_pipeline: wgpu::RenderPipeline,
     group_0_layout: wgpu::BindGroupLayout,
     group_1_layout: wgpu::BindGroupLayout,
-    rr: R,
+    inner: R,
 }
 
-trait Rendererr: Sized {
+impl<R> Wrapper<R>
+where
+    R: LayerRenderer,
+{
+    fn new(device: &wgpu::Device) -> Self {
+        let group_0_layout = SceneParams::group_layout(device, R::NAME);
+        let group_1_layout = R::per_layer_group_layout(device);
+
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some(&format!("render {} pipeline layout", R::NAME)),
+            bind_group_layouts: &[&group_0_layout, &group_1_layout],
+            push_constant_ranges: &[],
+        });
+
+        let inner = R::new();
+
+        Self {
+            render_pipeline: inner.create_render_pipeline(device, &pipeline_layout),
+            group_0_layout,
+            group_1_layout,
+            inner,
+        }
+    }
+}
+
+trait LayerRenderer: Sized {
     type Data<'a>;
     type PerLayerBinding: Pod + Zeroable;
 
     const NAME: &'static str;
-    const SHADER: ShaderModuleDescriptor<'static>;
 
     const USES_POINTS: bool;
 
     fn new() -> Self;
 
-    fn init(device: &wgpu::Device) -> Stuff<Self> {
-        let group_0_layout = SceneParams::group_layout(device, "line");
-        let group_1_layout = Self::per_layer_group_layout(device);
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("render line pipeline layout"),
-            bind_group_layouts: &[&group_0_layout, &group_1_layout],
-            push_constant_ranges: &[],
-        });
-
-        Stuff {
-            render_pipeline: Self::create_render_pipeline(device, &pipeline_layout),
-            group_0_layout,
-            group_1_layout,
-            rr: Self::new(),
-        }
-    }
+    fn shader(&self) -> ShaderModuleDescriptor<'static>;
 
     fn create_render_pipeline(
+        &self,
         device: &wgpu::Device,
         pipeline_layout: &wgpu::PipelineLayout,
     ) -> wgpu::RenderPipeline {
         let sample_count = 4;
-        let shader = device.create_shader_module(Self::SHADER);
+        let shader = device.create_shader_module(self.shader());
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(&format!("{} render pipeline", Self::NAME)),
@@ -197,9 +206,11 @@ impl SceneParams {
         layout: &wgpu::BindGroupLayout,
         layer_name: &str,
     ) -> wgpu::BindGroup {
-        let scene_buffer = to_buffer(device, self);
+        let name = format!("{layer_name} bind group 0");
+        let scene_buffer = to_buffer(device, &name, self);
+
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(&format!("{layer_name} bind group 0")),
+            label: Some(&name),
             layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
@@ -209,19 +220,19 @@ impl SceneParams {
     }
 }
 
-fn to_buffer<T>(device: &wgpu::Device, value: &T) -> wgpu::Buffer
+fn to_buffer<T>(device: &wgpu::Device, name: &str, value: &T) -> wgpu::Buffer
 where
     T: Pod + Zeroable + std::fmt::Debug,
 {
     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Line Thickness Buffer"),
+        label: Some(name),
         contents: bytemuck::bytes_of(value),
         usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
     })
 }
 
 pub struct Renderer<'a> {
-    line: Stuff<line::Temp>,
+    line: Wrapper<line::Renderer>,
     scatter: ScatterRenderer,
     surface: Surface<'a>,
     device: Device,
@@ -233,7 +244,7 @@ pub struct Renderer<'a> {
 fn create_msaa_texture(device: &Device, width: u32, height: u32) -> TextureView {
     device
         .create_texture(&wgpu::TextureDescriptor {
-            label: Some("Multisample Framebuffer"),
+            label: Some("multisample framebuffer"),
             size: wgpu::Extent3d {
                 width,
                 height,
@@ -253,14 +264,14 @@ fn create_msaa_texture(device: &Device, width: u32, height: u32) -> TextureView 
 impl<'a> Renderer<'a> {
     fn usee<'b, R, I>(
         &self,
-        stuff: &Stuff<R>,
+        stuff: &Wrapper<R>,
         encoder: &mut CommandEncoder,
         view: &TextureView,
         scene_params: SceneParams,
         clear: Option<wgpu::Color>,
         datas: I,
     ) where
-        R: Rendererr,
+        R: LayerRenderer,
         I: Iterator<Item = R::Data<'b>>,
     {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -286,22 +297,15 @@ impl<'a> Renderer<'a> {
         render_pass.set_bind_group(0, &bind_group0, &[]);
 
         for data in datas {
-            let (a, b) = stuff.rr.counts(&data);
+            let (vertices, instances) = stuff.inner.counts(&data);
 
             let bind_group1 =
                 stuff
-                    .rr
+                    .inner
                     .create_per_layer_group(&self.device, &stuff.group_1_layout, &data);
             render_pass.set_bind_group(1, &bind_group1, &[]);
 
-            render_pass.draw(a, b);
-            // render_pass.draw(0..(line.data.len() * 2) as u32, 0..1);
-
-            // if self.is_miter {
-            //     render_pass.draw(0..(line.data.len() * 2) as u32, 0..1);
-            // } else {
-            //     render_pass.draw(0..6, 0..(line.data.len() as
-            // u32).saturating_sub(1)); }
+            render_pass.draw(vertices, instances);
         }
     }
 
@@ -317,7 +321,7 @@ impl<'a> Renderer<'a> {
         //     .unwrap_or(surface_caps.formats[0]);
 
         Self {
-            line: line::Temp::init(&device),
+            line: Wrapper::new(&device),
             scatter: ScatterRenderer::new(&device),
             device,
             msaa_view: msaa_texture,
@@ -373,7 +377,16 @@ impl<'a> Renderer<'a> {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         let scene_params = layout.scene_params();
-        layers.for_each(|layer| self.render_layer(layer, &mut encoder, &view, scene_params));
+        let background = wgpu::Color {
+            r: 1.,
+            g: 1.,
+            b: 1.,
+            a: 1.,
+        };
+        layers.enumerate().for_each(|(i, layer)| {
+            let clear = if i == 0 { Some(background) } else { None };
+            self.render_layer(layer, &mut encoder, &view, clear, scene_params)
+        });
 
         self.queue.submit([encoder.finish()]);
         output.present();
@@ -386,6 +399,7 @@ impl<'a> Renderer<'a> {
         layer: Layer,
         encoder: &mut CommandEncoder,
         view: &TextureView,
+        clear: Option<wgpu::Color>,
         scene_params: SceneParams,
     ) {
         match layer {
@@ -397,12 +411,7 @@ impl<'a> Renderer<'a> {
                 encoder,
                 view,
                 scene_params,
-                Some(wgpu::Color {
-                    r: 1.,
-                    g: 1.,
-                    b: 1.,
-                    a: 1.,
-                }),
+                clear,
                 lines.into_iter(),
             ),
             Layer::Scatter(scatter) => self.scatter.render(
@@ -413,6 +422,6 @@ impl<'a> Renderer<'a> {
                 scene_params,
                 std::iter::once(scatter),
             ),
-        }
+        };
     }
 }
