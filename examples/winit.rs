@@ -115,7 +115,7 @@ impl ortelius::State for State {
                     .enumerate()
                     .map(|(i, buffer)| layer::Line {
                         data: buffer,
-                        thickness: 2.,
+                        thickness: 0.004,
                         colour: COLOURS[i],
                     })
                     .collect(),

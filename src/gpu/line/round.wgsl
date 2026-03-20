@@ -8,9 +8,16 @@ struct SceneParams {
 
 @group(0) @binding(0) var<uniform> scene: SceneParams;
 
+struct PerLineParams {
+    colour: vec4<f32>,
+    radius: f32,
+    _pad_0: f32,
+    _pad_1: f32,
+    _pad_2: f32,
+}
+
 @group(1) @binding(0) var<storage, read> points: array<vec2<f32>>;
-@group(1) @binding(1) var<uniform> radius: f32;
-@group(1) @binding(2) var<uniform> colour: vec4<f32>;
+@group(1) @binding(1) var<uniform> line: PerLineParams;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -24,7 +31,7 @@ fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
     @builtin(instance_index) instance_index: u32
 ) -> VertexOutput {
-    let radius = 0.004;
+    let radius = line.radius;
     var out: VertexOutput;
 
     let aspect = scene.viewport_size.x / scene.viewport_size.y;
@@ -68,7 +75,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let radius = 0.004;
+    let radius = line.radius;
 
     // 1. Calculate the shortest distance from the current pixel to the line segment
     let pa = in.frag_pos - in.p0;
@@ -92,5 +99,5 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         discard;
     }
 
-    return vec4<f32>(colour.rgb, colour.a * alpha);
+    return vec4<f32>(line.colour.rgb, line.colour.a * alpha);
 }

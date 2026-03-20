@@ -6,11 +6,10 @@ use std::{mem::size_of, ops::Range};
 
 pub(crate) use buffer::GpuBuffer;
 use bytemuck::{Pod, Zeroable};
-use line::LineRenderer;
 use scatter::ScatterRenderer;
 use vello::wgpu::{
-    self, BindGroup, CommandEncoder, Device, Queue, ShaderModule, Surface, SurfaceConfiguration,
-    TextureFormat, TextureView, util::DeviceExt,
+    self, BindGroup, CommandEncoder, Device, Queue, ShaderModuleDescriptor, Surface,
+    SurfaceConfiguration, TextureFormat, TextureView, util::DeviceExt,
 };
 
 use crate::{Layer, layout::PlotInstanceLayout};
@@ -30,7 +29,7 @@ trait Rendererr: Sized {
     type PerLayerBinding: Pod + Zeroable;
 
     const NAME: &'static str;
-    const SHADER: ShaderModule;
+    const SHADER: ShaderModuleDescriptor<'static>;
 
     const USES_POINTS: bool;
 
@@ -59,18 +58,19 @@ trait Rendererr: Sized {
         pipeline_layout: &wgpu::PipelineLayout,
     ) -> wgpu::RenderPipeline {
         let sample_count = 4;
+        let shader = device.create_shader_module(Self::SHADER);
 
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Line Render Pipeline"),
+            label: Some(&format!("{} render pipeline", Self::NAME)),
             layout: Some(pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &Self::SHADER,
+                module: &shader,
                 entry_point: Some("vs_main"),
                 buffers: &[],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &Self::SHADER,
+                module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     // format: config.format,
@@ -154,8 +154,12 @@ trait Rendererr: Sized {
 
     fn counts(&self, data: &Self::Data<'_>) -> (Range<u32>, Range<u32>);
 
-    fn create_per_layer_group<'a>(&self, device: &wgpu::Device, data: &Self::Data<'a>)
-    -> BindGroup;
+    fn create_per_layer_group<'a>(
+        &self,
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        data: &Self::Data<'a>,
+    ) -> BindGroup;
 }
 
 #[repr(C)]
@@ -217,7 +221,7 @@ where
 }
 
 pub struct Renderer<'a> {
-    line: LineRenderer,
+    line: Stuff<line::Temp>,
     scatter: ScatterRenderer,
     surface: Surface<'a>,
     device: Device,
@@ -250,7 +254,6 @@ impl<'a> Renderer<'a> {
     fn usee<'b, R, I>(
         &self,
         stuff: &Stuff<R>,
-        layer: Layer,
         encoder: &mut CommandEncoder,
         view: &TextureView,
         scene_params: SceneParams,
@@ -285,7 +288,10 @@ impl<'a> Renderer<'a> {
         for data in datas {
             let (a, b) = stuff.rr.counts(&data);
 
-            let bind_group1 = stuff.rr.create_per_layer_group(&self.device, &data);
+            let bind_group1 =
+                stuff
+                    .rr
+                    .create_per_layer_group(&self.device, &stuff.group_1_layout, &data);
             render_pass.set_bind_group(1, &bind_group1, &[]);
 
             render_pass.draw(a, b);
@@ -311,7 +317,7 @@ impl<'a> Renderer<'a> {
         //     .unwrap_or(surface_caps.formats[0]);
 
         Self {
-            line: LineRenderer::new(&device),
+            line: line::Temp::init(&device),
             scatter: ScatterRenderer::new(&device),
             device,
             msaa_view: msaa_texture,
@@ -386,12 +392,17 @@ impl<'a> Renderer<'a> {
             Layer::Title(_) => todo!(),
             Layer::XAxis { .. } => todo!(),
             Layer::YAxis { .. } => todo!(),
-            Layer::Lines(lines) => self.line.render(
-                &self.device,
+            Layer::Lines(lines) => self.usee(
+                &self.line,
                 encoder,
                 view,
-                &self.msaa_view,
                 scene_params,
+                Some(wgpu::Color {
+                    r: 1.,
+                    g: 1.,
+                    b: 1.,
+                    a: 1.,
+                }),
                 lines.into_iter(),
             ),
             Layer::Scatter(scatter) => self.scatter.render(
