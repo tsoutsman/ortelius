@@ -6,7 +6,7 @@ struct SceneParams {
 };
 @group(0) @binding(0) var<uniform> scene: SceneParams;
 
-struct PerScatterParams {
+struct Params {
     colour: vec4<f32>,
     radius: f32,
     _pad_0: f32,
@@ -14,7 +14,7 @@ struct PerScatterParams {
     _pad_2: f32,
 }
 @group(1) @binding(0) var<storage, read> points: array<vec2<f32>>;
-@group(1) @binding(1) var<uniform> scatter: PerScatterParams;
+@group(1) @binding(1) var<uniform> scatter: Params;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -28,10 +28,8 @@ fn vs_main(
 ) -> VertexOutput {
     var out: VertexOutput;
 
-    // 1. Get the center point in NDC space (-1 to 1)
-    let center = (scene.projection_matrix * vec4<f32>(points[instance_index], 0.0, 1.0)).xy;
+    let ndc_center = scene.projection_matrix * vec4<f32>(points[instance_index], 0.0, 1.0);
 
-    // 2. Generate the square quad
     var quad_pos = array<vec2<f32>, 6>(
         vec2<f32>(-1.0, -1.0),
         vec2<f32>( 1.0, -1.0),
@@ -44,32 +42,19 @@ fn vs_main(
     let local_coord = quad_pos[vertex_index];
     out.local_pos = local_coord;
 
-    // 3. Calculate the aspect ratio from your viewport uniform
-    let aspect_ratio = scene.viewport_size.x / scene.viewport_size.y;
+    let ndc_radius = (scatter.radius / scene.viewport_size) * 2.0;
 
-    // 4. Calculate the base offset
-    var offset = local_coord * scatter.radius;
+    let offset = local_coord * ndc_radius;
+    out.position = ndc_center + vec4<f32>(offset, 0.0, 0.0);
 
-    // 5. Correct the X offset to counter the screen stretch
-    offset.x = offset.x / aspect_ratio;
-
-    // 6. Add the corrected offset to the NDC center
-    let final_pos = center + offset;
-
-    out.position = vec4<f32>(final_pos, 0.0, 1.0);
-    
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    // 1. Calculate the distance from the center of the quad (0, 0)
     let dist = length(in.local_pos);
 
-    // 2. Figure out exactly how thick 1 pixel is in this local coordinate space
     let pixel_size = fwidth(dist);
-
-    // 3. Smooth over exactly 1 pixel width, ending right at the radius edge (1.0)
     let alpha = 1.0 - smoothstep(1.0 - pixel_size, 1.0, dist);
     
     if (alpha < 0.01) {

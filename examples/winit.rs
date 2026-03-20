@@ -162,14 +162,14 @@ impl ortelius::State for State {
                     .enumerate()
                     .map(|(i, buffer)| layer::Line {
                         data: buffer,
-                        thickness: 0.004,
+                        thickness: 3.,
                         colour: COLOURS[i],
                     })
                     .collect(),
             ),
             Layer::Scatters(vec![layer::Scatter {
                 data: self.line_buffers.first().unwrap(),
-                radius: 0.01,
+                radius: 2.5,
                 colour: [0., 0., 0., 1.],
             }]),
         ]
